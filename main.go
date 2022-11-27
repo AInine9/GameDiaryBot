@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 func main() {
@@ -44,13 +45,34 @@ func main() {
 }
 
 func ActivityStatusUpdate(s *discordgo.Session, v *discordgo.PresenceUpdate) {
-	now := time.Now()
+	apiURL := os.Getenv("API_URL")
 	userId := v.User.ID
+	client := &http.Client{}
 
-	if len(v.Activities) == 0 {
-		// TODO: ゲーム終了したときの処理
+	// TODO それぞれ認証情報追加する, Query->他の形式に変えるかも
+	if len(v.Activities) == 0 && v.Status == discordgo.StatusOnline {
+		params := "userId=" + url.QueryEscape(userId)
+		endpoint := fmt.Sprintf("%s/endplaying?%s", apiURL, params)
+		PostURL(endpoint, client)
 	} else {
-		// TODO: ゲーム開始したときの処理
 		gameName := v.Activities[0].Name
+		params := "userId=" + url.QueryEscape(userId) + "&gameName=" + url.QueryEscape(gameName)
+		endpoint := fmt.Sprintf("%s/startplaying?%s", apiURL, params)
+		PostURL(endpoint, client)
 	}
+}
+
+func PostURL(endpoint string, client *http.Client) {
+	req, err := http.NewRequest("POST", endpoint, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer resp.Body.Close()
 }
